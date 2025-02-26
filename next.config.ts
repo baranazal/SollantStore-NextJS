@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    typedRoutes: true,
+    serverActions: {
+      bodySizeLimit: "2mb"
+    },
+  },
+  images: {
+    domains: ['eachcpvnomxtooeglbtg.supabase.co'], // Add your Supabase project domain
+  }
 };
 
 export default nextConfig;
