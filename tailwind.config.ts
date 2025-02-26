@@ -82,10 +82,19 @@ const config = {
         "slide-in": "slideIn 0.3s ease-out",
         "slide-out": "slideOut 0.3s ease-out",
       },
+      backdropFilter: {
+        'none': 'none',
+        'blur': 'blur(20px)',
+      },
     },
   },
   
   plugins: [animate],
+  variants: {
+    extend: {
+      backdropFilter: ['responsive'],
+    },
+  },
 }
 
 export default config;
