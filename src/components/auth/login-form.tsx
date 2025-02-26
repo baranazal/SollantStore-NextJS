@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -30,12 +30,19 @@ import { toast } from 'react-hot-toast'
 import { z } from 'zod'
 import type { Route } from 'next'
 
+type SignInFormValues = {
+  email: string;
+  password: string;
+}
+
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const verificationPending = searchParams.get('verification') === 'pending'
   const { signIn } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
-  const form = useForm({
+  const form = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
       email: '',
@@ -63,6 +70,11 @@ export default function LoginForm() {
         <CardDescription>
           Enter your email and password to access your account
         </CardDescription>
+        {verificationPending && (
+          <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-md text-sm">
+            Please verify your email address before logging in. Check your inbox for the verification link.
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <Form {...form}>

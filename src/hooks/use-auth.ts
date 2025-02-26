@@ -2,21 +2,33 @@ import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 
-interface ProfileUpdateData {
+// Base interface for common profile fields
+interface ProfileData {
+  firstName: string
+  lastName: string
+  phone: string
+  country: string
+  city: string
+  village: string
+  streetAddress: string
+}
+
+// For new user registration - requires all fields
+interface SignUpData extends ProfileData {
+  email: string
+  password: string
+}
+
+// For profile updates - all fields are optional
+interface ProfileUpdateData extends Partial<ProfileData> {
   email?: string
-  first_name?: string
-  last_name?: string
-  phone?: string
-  country?: string
-  city?: string
-  street_address?: string
 }
 
 interface AuthStore {
   user: User | null
   isLoading: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<User | null>
+  signUp: (data: SignUpData) => Promise<User | null>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateProfile: (data: ProfileUpdateData) => Promise<void>
@@ -37,19 +49,29 @@ export const useAuth = create<AuthStore>((set) => ({
     set({ user: data.user })
   },
 
-  signUp: async (email: string, password: string) => {
-    const { data: { user }, error } = await supabase.auth.signUp({
+  signUp: async (data: SignUpData) => {
+    const { email, password, ...profile } = data
+    
+    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          email,
+          first_name: profile.firstName,
+          last_name: profile.lastName,
+          phone: profile.phone,
+          country: profile.country,
+          city: profile.city,
+          village: profile.village,
+          street_address: profile.streetAddress
         }
       }
     })
 
-    if (error) throw error
-    if (user) set({ user })
+    if (signUpError || !user) {
+      throw signUpError || new Error('Failed to create user')
+    }
+
     return user
   },
 
