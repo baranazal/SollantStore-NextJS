@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -28,6 +28,16 @@ import {
 import { Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { z } from 'zod'
+import { Country, City, ICity } from 'country-state-city'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import ReactCountryFlag from "react-country-flag"
+import palestineData from '@/data/palestine/palestineCities.json'
 
 type SignUpFormValues = z.infer<typeof signUpSchema>
 
@@ -35,7 +45,20 @@ export default function SignupForm() {
   const router = useRouter()
   const { signUp } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
-
+  const [selectedCountry, setSelectedCountry] = useState<string>('PS')
+  const [cities, setCities] = useState<ICity[]>(() => {
+    // Initialize with Palestine cities
+    const palestineCities = palestineData.cities.map(city => ({
+      name: city.name,
+      countryCode: 'PS',
+      stateCode: '',
+      latitude: '',
+      longitude: ''
+    }))
+    return palestineCities
+  })
+  const [villages, setVillages] = useState<string[]>([])
+  
   const form = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
@@ -43,7 +66,7 @@ export default function SignupForm() {
       firstName: '',
       lastName: '',
       phone: '',
-      country: '',
+      country: 'PS',
       city: '',
       village: '',
       streetAddress: '',
@@ -55,14 +78,59 @@ export default function SignupForm() {
   const onSubmit = async (data: SignUpFormValues) => {
     try {
       setIsLoading(true)
-      await signUp(data)
-      // Redirect to login page with verification pending parameter
+      const signUpData = {
+        ...data,
+        // Ensure village is a string, even if empty
+        village: data.country === 'PS' ? (data.village || '') : ''
+      }
+      await signUp(signUpData)
       router.push('/login?verification=pending')
     } catch (error) {
       toast.error('Something went wrong. Please try again.')
       console.error(error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Get countries list
+  const countries = useMemo(() => {
+    return Country.getAllCountries()
+  }, [])
+
+  // Update cities when country changes
+  const handleCountryChange = (countryCode: string) => {
+    setSelectedCountry(countryCode)
+    if (countryCode === 'PS') {
+      // Add required ICity properties
+      const palestineCities = palestineData.cities.map(city => ({
+        name: city.name,
+        countryCode: 'PS',
+        stateCode: '',
+        latitude: '',
+        longitude: ''
+      }))
+      setCities(palestineCities)
+      form.setValue('city', '')
+      form.setValue('village', '')
+    } else {
+      // Use country-state-city data for other countries
+      const allCities = City.getCitiesOfCountry(countryCode) || []
+      const uniqueCities = allCities.filter((city, index, self) =>
+        index === self.findIndex((c) => c.name === city.name)
+      )
+      setCities(uniqueCities)
+      setVillages([])
+      form.setValue('city', '')
+      form.setValue('village', '')
+    }
+  }
+
+  const handleCityChange = (cityName: string) => {
+    if (selectedCountry === 'PS') {
+      const cityData = palestineData.cities.find(city => city.name === cityName)
+      setVillages(cityData?.villages || [])
+      form.setValue('village', '')
     }
   }
 
@@ -140,42 +208,114 @@ export default function SignupForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Country</FormLabel>
-                  <FormControl>
-                    <Input placeholder="United States" {...field} />
-                  </FormControl>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      handleCountryChange(value)
+                    }}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a country" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-[296px]">
+                      {countries.map((country) => (
+                        <SelectItem 
+                          key={country.isoCode} 
+                          value={country.isoCode} 
+                          className="flex items-center"
+                        >
+                          <ReactCountryFlag 
+                            countryCode={country.isoCode} 
+                            svg 
+                            style={{
+                              width: '1.2em',
+                              height: '1.2em',
+                              marginRight: '12px'
+                            }}
+                          />
+                          {country.isoCode === 'PS' ? 'Palestine' : country.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
+            <FormField
+              control={form.control}
+              name="city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      handleCityChange(value)
+                    }}
+                    defaultValue={field.value}
+                    disabled={!selectedCountry}
+                  >
                     <FormControl>
-                      <Input placeholder="New York" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a city" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <SelectContent className="max-h-[296px] overflow-y-auto">
+                      {cities.map((city) => (
+                        <SelectItem 
+                          key={city.name}
+                          value={city.name}
+                          className="cursor-pointer hover:bg-accent"
+                        >
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {selectedCountry === 'PS' && (
               <FormField
                 control={form.control}
                 name="village"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Village/Area</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Brooklyn" {...field} />
-                    </FormControl>
+                    <FormLabel>Village</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      disabled={!villages.length}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a village" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-[296px] overflow-y-auto">
+                        {villages.map((village) => (
+                          <SelectItem 
+                            key={village}
+                            value={village}
+                            className="cursor-pointer hover:bg-accent"
+                          >
+                            {village}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
+            )}
 
             <FormField
               control={form.control}

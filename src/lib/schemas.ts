@@ -5,9 +5,9 @@ export const signUpSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().min(1, "Phone number is required"),
-  country: z.string().min(1, "Country is required"),
-  city: z.string().min(1, "City is required"),
-  village: z.string().min(1, "Village is required"),
+  country: z.string().min(1, "Please select a country"),
+  city: z.string().min(1, "Please select a city"),
+  village: z.string().optional(),
   streetAddress: z.string().min(1, "Street address is required"),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
