@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -29,6 +29,8 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { z } from 'zod'
 import type { Route } from 'next'
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Mail } from "lucide-react"
 
 type SignInFormValues = {
   email: string;
@@ -39,8 +41,22 @@ export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const verificationPending = searchParams.get('verification') === 'pending'
+  const verified = searchParams.get('verified') === 'true'
+  const verificationError = searchParams.get('error') === 'verification_failed'
   const { signIn } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (verified) {
+        toast.success('Email verified successfully! You can now log in.')
+      } else if (verificationError) {
+        toast.error('Email verification failed. Please try again.')
+      }
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [verified, verificationError])
 
   const form = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
@@ -70,13 +86,17 @@ export default function LoginForm() {
         <CardDescription>
           Enter your email and password to access your account
         </CardDescription>
-        {verificationPending && (
-          <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-md text-sm">
-            Please verify your email address before logging in. Check your inbox for the verification link.
-          </div>
-        )}
       </CardHeader>
       <CardContent>
+        {verificationPending && (
+          <Alert className="mb-4">
+            <Mail className="h-4 w-4" />
+            <AlertTitle>Verification Required</AlertTitle>
+            <AlertDescription>
+              Please check your email to verify your account before logging in.
+            </AlertDescription>
+          </Alert>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField

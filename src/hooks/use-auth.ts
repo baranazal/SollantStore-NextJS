@@ -50,29 +50,38 @@ export const useAuth = create<AuthStore>((set) => ({
   },
 
   signUp: async (data: SignUpData) => {
-    const { email, password, ...profile } = data
-    
-    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: profile.firstName,
-          last_name: profile.lastName,
-          phone: profile.phone,
-          country: profile.country,
-          city: profile.city,
-          village: profile.village,
-          street_address: profile.streetAddress
-        }
+    try {
+      // Only create the auth user with all metadata
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            first_name: data.firstName,
+            last_name: data.lastName,
+            phone: data.phone,
+            country: data.country,
+            city: data.city,
+            village: data.village,
+            street_address: data.streetAddress,
+          },
+        },
+      })
+
+      if (signUpError) throw signUpError
+
+      if (authData.user) {
+        // Don't try to create profile manually
+        // The trigger will handle it automatically
+        set({ user: authData.user })
+        return authData.user
       }
-    })
-
-    if (signUpError || !user) {
-      throw signUpError || new Error('Failed to create user')
+      
+      return null
+    } catch (error) {
+      console.error('Error in signUp:', error)
+      throw error
     }
-
-    return user
   },
 
   signOut: async () => {
@@ -89,22 +98,57 @@ export const useAuth = create<AuthStore>((set) => ({
   },
 
   updateProfile: async (data: ProfileUpdateData) => {
-    const { data: user, error: userError } = await supabase.auth.updateUser({
-      email: data.email
-    })
-    if (userError) throw userError
+    // Get current user
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) throw new Error('No user logged in');
 
+    // Update auth user email if provided
+    if (data.email) {
+      const { error: userError } = await supabase.auth.updateUser({
+        email: data.email
+      });
+      if (userError) throw userError;
+    }
+
+    // Map the data to match the profiles table column names
+    const profileData = {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      phone: data.phone,
+      country: data.country,
+      city: data.city,
+      village: data.village,
+      street_address: data.streetAddress,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only include properties that are actually provided
+    const cleanProfileData = Object.fromEntries(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      Object.entries(profileData).filter(([_, v]) => v !== undefined)
+    );
+
+    // Update the profile
     const { error: profileError } = await supabase
       .from('profiles')
-      .update(data)
-      .eq('id', user.user.id)
+      .update(cleanProfileData)
+      .eq('id', currentUser.id);
 
-    if (profileError) throw profileError
-    set({ user: user.user })
+    if (profileError) throw profileError;
+    
+    // Re-fetch the user to update the state
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) set({ user });
   },
 }))
 
 // Initialize auth state
 supabase.auth.onAuthStateChange((event, session) => {
-  useAuth.setState({ user: session?.user || null, isLoading: false })
+  if (event === 'SIGNED_OUT') {
+    useAuth.setState({ user: null, isLoading: false })
+  } else if (session?.user) {
+    useAuth.setState({ user: session.user, isLoading: false })
+  } else {
+    useAuth.setState({ isLoading: false })
+  }
 })

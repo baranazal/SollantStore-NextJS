@@ -5,24 +5,20 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-
+  
   if (code) {
     const supabase = createRouteHandlerClient({ cookies })
-    await supabase.auth.exchangeCodeForSession(code)
-    
-    // After successful verification, create the profile
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase
-        .from('profiles')
-        .insert({
-          id: user.id,
-          email: user.email,
-          ...user.user_metadata
-        })
+    try {
+      await supabase.auth.exchangeCodeForSession(code)
+      
+      // Add success parameter to the redirect URL
+      return NextResponse.redirect(new URL(`${requestUrl.origin}/login?verified=true`))
+    } catch (error) {
+      console.error('Error verifying email:', error)
+      return NextResponse.redirect(new URL(`${requestUrl.origin}/login?error=verification_failed`))
     }
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(requestUrl.origin)
+  // Return to login page if no code present
+  return NextResponse.redirect(new URL(`${requestUrl.origin}/login`))
 } 

@@ -14,7 +14,8 @@ export const supabase = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   {
     auth: {
-      persistSession: true
+      persistSession: true,
+      autoRefreshToken: true,
     },
     global: {
       headers: {
@@ -33,28 +34,21 @@ export async function getCurrentUser() {
 
 export async function isAdmin(userId: string) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession();
     
-    if (authError || !user) {
-      console.error('Auth error:', authError)
-      return false
-    }
+    if (!session) return false;
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('profiles')
       .select('is_admin')
       .eq('id', userId)
       .single()
-
-    if (error) {
-      console.error('Query error:', error)
-      return false
-    }
-
-    return Boolean(data?.is_admin)
+      .throwOnError();
+    
+    return data?.is_admin || false;
   } catch (error) {
-    console.error('isAdmin check failed:', error)
-    return false
+    console.error('Error checking admin status:', error);
+    return false;
   }
 }
 

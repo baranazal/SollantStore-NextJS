@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import type { Route } from 'next'
 import { z } from 'zod'
 
 type SignUpFormValues = z.infer<typeof signUpSchema>
@@ -56,21 +55,12 @@ export default function SignupForm() {
   const onSubmit = async (data: SignUpFormValues) => {
     try {
       setIsLoading(true)
-      await signUp({
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        country: data.country,
-        city: data.city,
-        village: data.village,
-        streetAddress: data.streetAddress,
-      })
-      toast.success('Account created successfully')
-      router.push('/login?verification=pending' as Route)
+      await signUp(data)
+      // Redirect to login page with verification pending parameter
+      router.push('/login?verification=pending')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Something went wrong. Please try again.')
+      toast.error('Something went wrong. Please try again.')
+      console.error(error)
     } finally {
       setIsLoading(false)
     }
